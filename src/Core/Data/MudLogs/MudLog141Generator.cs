@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -35,7 +35,10 @@ namespace PDS.WITSMLstudio.Data.MudLogs
         /// The default Md uom
         /// </summary>
         public const MeasuredDepthUom MdUom = MeasuredDepthUom.m;
-        private const WellVerticalCoordinateUom TvdUom = WellVerticalCoordinateUom.m;
+        /// <summary>
+        /// The default Tvd uom
+        /// </summary>
+        public const WellVerticalCoordinateUom TvdUom = WellVerticalCoordinateUom.m;
         private const string GeologyIntervalUidPrefix = "geo-";
         private const string LithologyUidPrefix = "lith-";
 

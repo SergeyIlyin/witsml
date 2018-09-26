@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -88,7 +88,7 @@ namespace PDS.WITSMLstudio.Linq
 
             Context.LogQuery(Functions.GetFromStore, objectType, xmlIn, optionsIn);
 
-            using (var client = Context.Connection.CreateClientProxy())
+            using (var client = Context.Connection.CreateClientProxy().WithUserAgent())
             {
                 var wmls = (IWitsmlClient)client;
                 string suppMsgOut, xmlOut = string.Empty;

@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -87,6 +87,22 @@ namespace PDS.WITSMLstudio.Store.Data.Logs
             return OptionsIn.ReturnElements.All.Equals(returnElements) ||
                    OptionsIn.ReturnElements.DataOnly.Equals(returnElements) ||
                    (OptionsIn.ReturnElements.Requested.Equals(returnElements) && parser.Contains("logData"));
+        }
+
+        /// <summary>
+        /// Determines whether Log curve infos should be included in the query response.
+        /// </summary>
+        /// <param name="parser">The query parser.</param>
+        /// <returns><c>true</c> if Log curve infos should be included; otherwise, <c>false</c>.</returns>
+        public static bool IncludeLogCurveInfo(this WitsmlQueryParser parser)
+        {
+            var returnElements = parser.ReturnElements();
+
+            _log.DebugFormat("Checking if log curves should be included. Return Elements: {0};", returnElements);
+
+            return OptionsIn.ReturnElements.All.Equals(returnElements) ||
+                   OptionsIn.ReturnElements.HeaderOnly.Equals(returnElements) ||
+                   (OptionsIn.ReturnElements.Requested.Equals(returnElements) && parser.Contains(ObjectTypes.LogCurveInfo));
         }
 
         /// <summary>

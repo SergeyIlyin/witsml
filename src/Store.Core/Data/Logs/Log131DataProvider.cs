@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -22,7 +22,7 @@ using System.Xml.Linq;
 using Energistics.DataAccess.WITSML131;
 using Energistics.DataAccess.WITSML131.ComponentSchemas;
 using Energistics.DataAccess.WITSML131.ReferenceData;
-using Energistics.Datatypes;
+using Energistics.Etp.Common.Datatypes;
 using PDS.WITSMLstudio.Framework;
 using PDS.WITSMLstudio.Data.Logs;
 
@@ -100,7 +100,7 @@ namespace PDS.WITSMLstudio.Store.Data.Logs
 
                 // Use existing curve UID, if available; otherwise, use the mnemonic
                 var curve = current?.LogCurveInfo.GetByMnemonic(mnemonicElement.Value);
-                var uid = curve?.Uid ?? mnemonicElement.Value;
+                var uid = curve?.Uid ?? mnemonicElement.Value.Replace(' ', '_');
 
                 // Update entity with UID
                 curve = dataObject.LogCurveInfo.GetByMnemonic(mnemonicElement.Value);

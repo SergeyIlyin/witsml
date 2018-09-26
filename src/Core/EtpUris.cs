@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -17,10 +17,9 @@
 //-----------------------------------------------------------------------
 
 using System;
-using System.Reflection;
 using System.Xml.Serialization;
 using Energistics.DataAccess;
-using Energistics.Datatypes;
+using Energistics.Etp.Common.Datatypes;
 using PDS.WITSMLstudio.Framework;
 using Witsml131 = Energistics.DataAccess.WITSML131;
 using Witsml141 = Energistics.DataAccess.WITSML141;
@@ -66,6 +65,55 @@ namespace PDS.WITSMLstudio
         /// The <see cref="EtpUri"/> for eml210
         /// </summary>
         public static readonly EtpUri Eml210 = new EtpUri("eml://eml21");
+
+        /// <summary>
+        /// Determines whether the left parts of two URIs are equal.
+        /// </summary>
+        /// <param name="uri">The URI.</param>
+        /// <param name="other">The other URI.</param>
+        /// <returns><c>true</c> if the left parts are equal; otherwise, <c>false</c>.</returns>
+        public static bool EqualsLeftPart(this EtpUri uri, string other)
+        {
+            return uri.EqualsLeftPart(new EtpUri(other));
+        }
+
+        /// <summary>
+        /// Determines whether the left parts of two URIs are equal.
+        /// </summary>
+        /// <param name="uri">The URI.</param>
+        /// <param name="other">The other URI.</param>
+        /// <returns><c>true</c> if the left parts are equal; otherwise, <c>false</c>.</returns>
+        public static bool EqualsLeftPart(this EtpUri uri, EtpUri other)
+        {
+            return uri.Equals(other.WithoutQuery());
+        }
+
+        /// <summary>
+        /// Gets the URI without any query string parameters.
+        /// </summary>
+        /// <param name="uri">The URI.</param>
+        /// <returns>A new <see cref="EtpUri"/> instance.</returns>
+        public static EtpUri WithoutQuery(this EtpUri uri)
+        {
+            return new EtpUri(uri.GetLeftPart());
+        }
+
+        /// <summary>
+        /// Gets the left part of the URI.
+        /// </summary>
+        /// <param name="uri">The ETP URI.</param>
+        public static string GetLeftPart(this EtpUri uri)
+        {
+            if (uri.IsValid)
+            {
+                return new Uri(uri).GetLeftPart(UriPartial.Path);
+            }
+
+            var value = uri.Uri;
+            var index = value.IndexOf("?", StringComparison.InvariantCultureIgnoreCase);
+
+            return index > -1 ? value.Substring(0, index) : value;
+        }
 
         /// <summary>
         /// Determines whether the specified URI is a root URI.
@@ -169,7 +217,7 @@ namespace PDS.WITSMLstudio
             return (entity as IWellboreObject)?.GetUri()
                 ?? (entity as IWellObject)?.GetUri()
                 ?? entity.GetUriFamily()
-                    .Append(ObjectTypes.GetObjectType(entity), entity.Uid);
+                    .Append(ObjectTypes.GetObjectType(entity), entity.Uid, true);
         }
 
         /// <summary>
@@ -181,8 +229,8 @@ namespace PDS.WITSMLstudio
         {
             return (entity as IWellboreObject)?.GetUri()
                 ?? entity.GetUriFamily()
-                    .Append(ObjectTypes.Well, entity.UidWell)
-                    .Append(ObjectTypes.GetObjectType(entity), entity.Uid);
+                    .Append(ObjectTypes.Well, entity.UidWell, true)
+                    .Append(ObjectTypes.GetObjectType(entity), entity.Uid, true);
         }
 
         /// <summary>
@@ -193,9 +241,30 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this IWellboreObject entity)
         {
             return entity.GetUriFamily()
-                .Append(ObjectTypes.Well, entity.UidWell)
-                .Append(ObjectTypes.Wellbore, entity.UidWellbore)
-                .Append(ObjectTypes.GetObjectType(entity), entity.Uid);
+                .Append(ObjectTypes.Well, entity.UidWell, true)
+                .Append(ObjectTypes.Wellbore, entity.UidWellbore, true)
+                .Append(ObjectTypes.GetObjectType(entity), entity.Uid, true);
+        }
+
+        /// <summary>
+        /// Gets the <see cref="EtpUri"/> for a given <see cref="Energistics.DataAccess.WITSML200.AbstractObject"/>  and parentUri.
+        /// </summary>
+        /// <param name="entity">The entity.</param>
+        /// <param name="parentUri">The parent URI.</param>
+        /// <returns>An <see cref="EtpUri"/> instance</returns>
+        public static EtpUri GetUri(this Witsml200.AbstractObject entity, EtpUri parentUri)
+        {
+            // Remove query string parameters, if any
+            var uri = parentUri.GetLeftPart();
+
+            if (!IsRootUri(uri))
+            {
+                // Remove trailing separator
+                uri = uri.TrimEnd('/');
+            }
+
+            return new EtpUri(uri)
+                .Append(ObjectTypes.GetObjectType(entity), entity.Uuid);
         }
 
         /// <summary>
@@ -254,7 +323,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml131.ComponentSchemas.LogCurveInfo entity, Witsml131.Log log)
         {
             return log.GetUri()
-                .Append(ObjectTypes.LogCurveInfo, entity.Mnemonic);
+                .Append(ObjectTypes.LogCurveInfo, entity.Mnemonic, true);
         }
 
         /// <summary>
@@ -266,7 +335,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml141.ComponentSchemas.LogCurveInfo entity, Witsml141.Log log)
         {
             return log.GetUri()
-                .Append(ObjectTypes.LogCurveInfo, entity.Mnemonic.Value);
+                .Append(ObjectTypes.LogCurveInfo, entity.Mnemonic.Value, true);
         }
 
         /// <summary>
@@ -290,7 +359,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml200.Channel entity, Witsml200.ChannelSet channelSet)
         {
             return channelSet.GetUri()
-                .Append(ObjectTypes.Channel, entity.Mnemonic);
+                .Append(ObjectTypes.Channel, entity.Uuid);
         }
 
         /// <summary>
@@ -303,7 +372,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml200.Channel entity, Witsml200.Log log, Witsml200.ChannelSet channelSet)
         {
             return channelSet.GetUri(log)
-                .Append(ObjectTypes.Channel, entity.Mnemonic);
+                .Append(ObjectTypes.Channel, entity.Uuid);
         }
 
         /// <summary>
@@ -315,7 +384,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml200.ComponentSchemas.ChannelIndex entity, Witsml200.Channel channel)
         {
             return channel.GetUri()
-                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic);
+                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic, true);
         }
 
         /// <summary>
@@ -327,7 +396,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml200.ComponentSchemas.ChannelIndex entity, Witsml200.ChannelSet channelSet)
         {
             return channelSet.GetUri()
-                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic);
+                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic, true);
         }
 
         /// <summary>
@@ -340,7 +409,7 @@ namespace PDS.WITSMLstudio
         public static EtpUri GetUri(this Witsml200.ComponentSchemas.ChannelIndex entity, Witsml200.Log log, Witsml200.ChannelSet channelSet)
         {
             return channelSet.GetUri(log)
-                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic);
+                .Append(ObjectTypes.ChannelIndex, entity.Mnemonic, true);
         }
     }
 }

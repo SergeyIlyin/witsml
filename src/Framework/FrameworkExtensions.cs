@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Framework, 2018.1
+// PDS WITSMLstudio Framework, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -21,11 +21,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml.Serialization;
+using Microsoft.VisualBasic.FileIO;
 using PDS.WITSMLstudio.Framework.Properties;
 
 namespace PDS.WITSMLstudio.Framework
@@ -36,6 +38,7 @@ namespace PDS.WITSMLstudio.Framework
     public static class FrameworkExtensions
     {
         private static readonly string _defaultEncryptionKey = Settings.Default.DefaultEncryptionKey;
+        private static readonly log4net.ILog _log = log4net.LogManager.GetLogger(typeof(FrameworkExtensions));
 
         /// <summary>
         /// Gets the version for the <see cref="System.Reflection.Assembly"/> containing the specified <see cref="Type"/>.
@@ -95,6 +98,67 @@ namespace PDS.WITSMLstudio.Framework
                 : value.Split(new[] { separator }, StringSplitOptions.None)
                        .Select(x => x.Trim())
                        .ToArray();
+        }
+
+        /// <summary>
+        /// Splits the quoted string value based on the specified separator.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="separator">The separator.</param>
+        /// <returns>A string array.</returns>
+        public static string[] SplitQuotedString(this string value, string separator)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return new string[0];
+
+            // Check to see if delimiter is a single character and there are no quoted strings
+            if (separator.Length < 2 && !value.Contains("\""))
+            {
+                return value.SplitAndTrim(separator);
+            }
+
+            // TextFieldParser iterates when it detects new line characters
+            value = value.Replace("\n", " ");
+
+            using (var reader = new StringReader(value))
+            using (var parser = new TextFieldParser(reader))
+            {
+                parser.SetDelimiters(separator);
+
+                try
+                {
+                    return parser.ReadFields();
+                }
+                catch
+                {
+                    // Ignore
+                }
+            }
+
+            return new string[0];
+        }
+
+        /// <summary>
+        /// Joins an enumerable of strings that may contain quotes based with the specified separator in between.
+        /// </summary>
+        /// <param name="values">The values.</param>
+        /// <param name="separator">The separator.</param>
+        /// <returns>The string value.</returns>
+        public static string JoinQuotedStrings(this IEnumerable<string> values, string separator)
+        {
+            var stringValues = values.Select(value =>
+            {
+                if (string.IsNullOrEmpty(value))
+                    return string.Empty;
+
+                var needQuotes = value.IndexOf(separator, StringComparison.InvariantCulture) >= 0
+                                 || value.IndexOf("\"", StringComparison.InvariantCulture) >= 0
+                                 || value.IndexOf(Environment.NewLine, StringComparison.InvariantCulture) >= 0;
+                var csvValue = value.Replace("\"", "\"\"");
+
+                return needQuotes ? $"\"{csvValue}\"" : csvValue;
+            });
+            return string.Join(separator, stringValues);
         }
 
         /// <summary>
@@ -189,7 +253,7 @@ namespace PDS.WITSMLstudio.Framework
 
             foreach (var item in items)
                 action(item);
-            
+
             return items;
         }
 
@@ -353,9 +417,23 @@ namespace PDS.WITSMLstudio.Framework
         {
             if (string.IsNullOrWhiteSpace(enumValue)) return null;
 
-            if (Enum.IsDefined(enumType, enumValue))
+            enumType = Nullable.GetUnderlyingType(enumType) ?? enumType;
+
+            try
             {
-                return Enum.Parse(enumType, enumValue);
+                double index;
+
+                // Ensure enumValue is not numeric
+#if DEBUG
+                if (!double.TryParse(enumValue, out index) && Enum.IsDefined(enumType, enumValue))
+#else
+                if (!double.TryParse(enumValue, out index))
+#endif
+                    return Enum.Parse(enumType, enumValue, true);
+            }
+            catch
+            {
+                // Ignore
             }
 
             var enumMember = enumType.GetMembers().FirstOrDefault(x =>
@@ -377,7 +455,7 @@ namespace PDS.WITSMLstudio.Framework
                 throw new ArgumentException();
             }
 
-            return Enum.Parse(enumType, enumMember.Name);
+            return Enum.Parse(enumType, enumMember.Name, true);
         }
 
         /// <summary>
@@ -430,7 +508,16 @@ namespace PDS.WITSMLstudio.Framework
             var bytes = Convert.FromBase64String(value);
             var entropy = Encoding.Unicode.GetBytes(key ?? _defaultEncryptionKey);
 
-            bytes = ProtectedData.Unprotect(bytes, entropy, forLocalMachine ? DataProtectionScope.LocalMachine : DataProtectionScope.CurrentUser);
+            try
+            {
+                bytes = ProtectedData.Unprotect(bytes, entropy,
+                    forLocalMachine ? DataProtectionScope.LocalMachine : DataProtectionScope.CurrentUser);
+            }
+            catch (CryptographicException ex)
+            {
+                _log.ErrorFormat("Error decrypting string: {0}", ex);
+                return null;
+            }
             return Encoding.Unicode.GetString(bytes);
         }
 

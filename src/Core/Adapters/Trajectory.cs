@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -19,6 +19,7 @@
 using System;
 using System.Collections.Generic;
 using Energistics.DataAccess;
+using PDS.WITSMLstudio.Data.Trajectories;
 using PDS.WITSMLstudio.Framework;
 
 namespace PDS.WITSMLstudio.Adapters
@@ -78,6 +79,16 @@ namespace PDS.WITSMLstudio.Adapters
             DataSchemaVersion = OptionsIn.DataVersion.Version141.Value;
 
             InitializeTrajectoryStations();
+        }
+
+        /// <summary>
+        /// Returns whether the specified object is an instnce of a supported data type
+        /// </summary>
+        /// <param name="dataObject">The data object.</param>
+        /// <returns></returns>
+        public static bool IsSupportedObject(object dataObject)
+        {
+            return null != dataObject && (dataObject is Energistics.DataAccess.WITSML131.Trajectory || dataObject is Energistics.DataAccess.WITSML141.Trajectory);
         }
 
         /// <summary>
@@ -169,6 +180,15 @@ namespace PDS.WITSMLstudio.Adapters
         /// Gets the trajectory stations.
         /// </summary>
         public List<TrajectoryStation> TrajectoryStation { get; private set; }
+
+        /// <summary>
+        /// Gets a <see cref="TrajectoryDataReader"/> for the log.
+        /// </summary>
+        /// <returns>A <see cref="TrajectoryDataReader"/> instance.</returns>
+        public TrajectoryDataReader GetReader()
+        {
+            return _trajectory131?.GetReader() ?? _trajectory141.GetReader();
+        }
 
         private void InitializeTrajectoryStations()
         {

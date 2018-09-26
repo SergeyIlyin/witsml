@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -185,6 +185,31 @@ namespace PDS.WITSMLstudio.Data
                     x.StartsWith("@")
                         ? new XAttribute(x.Substring(1), string.Empty)
                         : (object) new XElement(ns + x));
+            });
+
+            return this;
+        }
+
+        /// <summary>
+        /// Adds elements or attributes to the document using the specified XPath expression.
+        /// </summary>
+        /// <param name="document">The document.</param>
+        /// <param name="xpath">The xpath.</param>
+        /// <param name="elementOrAttributes">The elements or attributes.</param>
+        /// <returns>This <see cref="DataObjectTemplate"/> instance.</returns>
+        public DataObjectTemplate Add(XDocument document, string xpath, params XObject[] elementOrAttributes)
+        {
+            var manager = document.Root.GetNamespaceManager();
+            xpath = XmlUtil.IncludeNamespacePrefix(xpath);
+
+            var ns = document.Root?.GetDefaultNamespace();
+
+            var element = document.XPathSelectElement(xpath, manager);
+            if (element == null) return this;
+
+            elementOrAttributes.ForEach(x =>
+            {
+                element.Add(x);
             });
 
             return this;

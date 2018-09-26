@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -42,6 +42,11 @@ namespace PDS.WITSMLstudio.Store.Providers.ChannelStreaming
         /// <summary>
         /// Channel range request
         /// </summary>
-        RangeRequest
+        RangeRequest,
+
+        /// <summary>
+        /// Channel Streaming directly to Real-Time for ChannelDataLoad processing
+        /// </summary>
+        ChannelDataLoad
     }
 }

@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -18,6 +18,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using log4net;
 using PDS.WITSMLstudio.Framework;
 
@@ -452,7 +453,9 @@ namespace PDS.WITSMLstudio
                 return new Dictionary<string, string>(0);
             }
 
-            return options.Split(';')
+            return WebUtility
+                .UrlDecode(options)
+                .Split(';')
                 .Select(x => x.Split('='))
                 .ToLookup(x => x.First(), x => x.Last())
                 .ToDictionary(x => x.Key, x => x.First());

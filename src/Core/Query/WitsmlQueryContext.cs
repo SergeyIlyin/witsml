@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -23,7 +23,7 @@ using System.Security;
 using System.Xml.Linq;
 using Energistics.DataAccess;
 using Energistics.DataAccess.WITSML141.ReferenceData;
-using Energistics.Datatypes;
+using Energistics.Etp.Common.Datatypes;
 using log4net;
 using PDS.WITSMLstudio.Framework;
 using PDS.WITSMLstudio.Data;
@@ -419,7 +419,7 @@ namespace PDS.WITSMLstudio.Query
 
         private short ExecuteQuery(Functions functionType, string objectType, string xmlIn, string optionsIn, out string xmlOut, out string suppMsgOut)
         {
-            using (var client = Connection.CreateClientProxy())
+            using (var client = Connection.CreateClientProxy().WithUserAgent())
             {
                 var wmls = (IWitsmlClient)client;
                 xmlOut = null;

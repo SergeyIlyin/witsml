@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -16,8 +16,10 @@
 // limitations under the License.
 //-----------------------------------------------------------------------
 
-using Energistics.Datatypes;
-using Energistics.Datatypes.ChannelData;
+using System.Collections.Generic;
+using System.Threading;
+using Energistics.Etp.Common.Datatypes;
+using Energistics.Etp.Common.Datatypes.ChannelData;
 
 namespace PDS.WITSMLstudio.Store.Providers.ChannelStreaming
 {
@@ -29,66 +31,57 @@ namespace PDS.WITSMLstudio.Store.Providers.ChannelStreaming
         /// <summary>
         /// Gets or sets the channel identifier.
         /// </summary>
-        /// <value>
-        /// The channel identifier.
-        /// </value>
         public long ChannelId { get; set; }
 
         /// <summary>
         /// Gets or sets the channel metadata.
         /// </summary>
-        /// <value>
-        /// The channel metadata.
-        /// </value>
-        public ChannelMetadataRecord ChannelMetadata { get; set; }
+        public IChannelMetadataRecord ChannelMetadata { get; set; }
 
         /// <summary>
         /// Gets or sets the parent URI.
         /// </summary>
-        /// <value>
-        /// The parent URI.
-        /// </value>
         public EtpUri ParentUri { get; set; }
 
         /// <summary>
         /// Gets or sets the start index.
         /// </summary>
-        /// <value>
-        /// The start index.
-        /// </value>
         public long? StartIndex { get; set; }
 
         /// <summary>
         /// Gets or sets the end index.
         /// </summary>
-        /// <value>
-        /// The end index.
-        /// </value>
         public long? EndIndex { get; set; }
 
         /// <summary>
-        /// Gets or sets the index count.
+        /// Gets or sets the last index value processed.
         /// </summary>
-        /// <value>
-        /// The index count before and including the latest index value.
-        /// </value>
+        public long? LastIndex { get; set; }
+
+        /// <summary>
+        /// Gets or sets the index count before and including the latest index value.
+        /// </summary>
         public int IndexCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the real time status of the channel.
+        /// </summary>
+        public bool IsRealTime { get; set; }
 
         /// <summary>
         /// Gets or sets the type of the channel streaming.
         /// </summary>
-        /// <value>
-        /// The type of the channel streaming.
-        /// </value>
         public ChannelStreamingTypes ChannelStreamingType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the transfer mode.
+        /// </summary>
+        public TransferModes TransferMode { get; set; }
 
         /// <summary>
         /// Gets or sets the range request message header.
         /// </summary>
-        /// <value>
-        /// The range request message header.
-        /// </value>
-        public MessageHeader RangeRequestHeader { get; set; }
+        public IMessageHeader RangeRequestHeader { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether change notification 
@@ -99,5 +92,20 @@ namespace PDS.WITSMLstudio.Store.Providers.ChannelStreaming
         /// otherwise, <c>false</c>.
         /// </value>
         public bool ReceiveChangeNotification { get; set; }
+
+        /// <summary>
+        /// Gets or sets the query context.
+        /// </summary>
+        public string QueryContext { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the cancellation token source.
+        /// </summary>
+        public CancellationTokenSource TokenSource { get; set; }
+
+        /// <summary>
+        /// Gets or sets the custom data.
+        /// </summary>
+        public Dictionary<string, object> CustomData { get; set; } = new Dictionary<string, object>();
     }
 }

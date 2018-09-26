@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -102,9 +102,9 @@ namespace PDS.WITSMLstudio.Store.Jobs
                 DateTime.UtcNow.AddSeconds(-1 * WitsmlSettings.TrajectoryGrowingTimeoutPeriod));
             wellboreUris.AddRange(trajectoryWellboreUris);
 
-            //var mudLogWellboreUris = _growingObjectDataProvider.ExpireGrowingObjects(ObjectTypes.MudLog,
-            //    DateTime.UtcNow.AddSeconds(-1 * WitsmlSettings.MudLogGrowingTimeoutPeriod));
-            //wellboreUris.AddRange(mudLogWellboreUris);
+            var mudLogWellboreUris = _growingObjectDataProvider.ExpireGrowingObjects(ObjectTypes.MudLog,
+                DateTime.UtcNow.AddSeconds(-1 * WitsmlSettings.MudLogGrowingTimeoutPeriod));
+            wellboreUris.AddRange(mudLogWellboreUris);
 
             _growingObjectDataProvider.ExpireWellboreObjects(wellboreUris);
         }

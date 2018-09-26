@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -84,6 +84,16 @@ namespace PDS.WITSMLstudio.Adapters
                 throw new ArgumentException(@"Not a WITSML 1.3.1.1 or WITSML 1.4.1.1 log", nameof(log));
 
             InitializeLogData();
+        }
+
+        /// <summary>
+        /// Returns whether the specified object is an instnce of a supported data type
+        /// </summary>
+        /// <param name="dataObject">The data object.</param>
+        /// <returns></returns>
+        public static bool IsSupportedObject(object dataObject)
+        {
+            return null != dataObject && (dataObject is Energistics.DataAccess.WITSML131.Log || dataObject is Energistics.DataAccess.WITSML141.Log);
         }
 
         /// <summary>

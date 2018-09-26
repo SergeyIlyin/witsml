@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -21,6 +21,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Web.Services.Protocols;
 using Energistics.DataAccess;
 using Witsml131 = Energistics.DataAccess.WITSML131;
 using Witsml141 = Energistics.DataAccess.WITSML141;
@@ -35,6 +36,8 @@ namespace PDS.WITSMLstudio
     /// </summary>
     public static class Extensions
     {
+        private static readonly string _defaulWmlstUserAgent = Settings.Default.DefaultWmlsUserAgent;
+
         /// <summary>
         /// Initializes a new UID value if one was not specified.
         /// </summary>
@@ -96,6 +99,21 @@ namespace PDS.WITSMLstudio
         }
 
         /// <summary>
+        /// Sets the User-Agent header sent by the SOAP client proxy.
+        /// </summary>
+        /// <param name="proxy">The SOAP client proxy.</param>
+        /// <param name="userAgent">The user agent.</param>
+        /// <returns>The <see cref="SoapHttpClientProtocol"/> instance.</returns>
+        public static SoapHttpClientProtocol WithUserAgent(this SoapHttpClientProtocol proxy, string userAgent = null)
+        {
+            if (proxy == null) return null;
+
+            proxy.UserAgent = userAgent ?? _defaulWmlstUserAgent;
+
+            return proxy;
+        }
+
+        /// <summary>
         /// Builds an emtpy WITSML query for the specified data object type and data schema version.
         /// </summary>
         /// <param name="connection">The WITSML connection.</param>
@@ -104,12 +122,12 @@ namespace PDS.WITSMLstudio
         /// <returns>An <see cref="IEnergisticsCollection"/> instance.</returns>
         public static IEnergisticsCollection BuildEmptyQuery(this WITSMLWebServiceConnection connection, Type type, string version)
         {
-            var method = connection.GetType()
-                .GetMethod("BuildEmptyQuery", BindingFlags.Static | BindingFlags.Public)
+            var method = connection?.GetType()
+                .GetMethod("BuildEmptyQuery", BindingFlags.Static | BindingFlags.Public)?
                 .MakeGenericMethod(type);
 
-            var query = method.Invoke(null, null) as IEnergisticsCollection;
-            query.SetVersion(version);
+            var query = method?.Invoke(null, null) as IEnergisticsCollection;
+            query?.SetVersion(version);
 
             return query;
         }
@@ -149,6 +167,29 @@ namespace PDS.WITSMLstudio
         public static List<TObject> AsList<TObject>(this TObject instance) where TObject : IUniqueId
         {
             return new List<TObject>() { instance };
+        }
+
+        /// <summary>
+        /// Adds the item to the collection.
+        /// </summary>
+        /// <typeparam name="T">The item type.</typeparam>
+        /// <param name="collection">The collection.</param>
+        /// <param name="item">The item.</param>
+        public static void Add<T>(this ICollection<T> collection, object item)
+        {
+            collection?.Add((T)item);
+        }
+
+        /// <summary>
+        /// Adds the item to the collection.
+        /// </summary>
+        /// <typeparam name="T1">The item type.</typeparam>
+        /// <typeparam name="T2">The base type.</typeparam>
+        /// <param name="collection">The collection.</param>
+        /// <param name="item">The item.</param>
+        public static void Add<T1, T2>(this ICollection<T1> collection, T2 item) where T1 : T2
+        {
+            collection?.Add((T1)item);
         }
 
         /// <summary>
@@ -237,6 +278,26 @@ namespace PDS.WITSMLstudio
         public static long? ToUnixTimeMicroseconds(this Timestamp? timestamp)
         {
             return timestamp?.ToUnixTimeMicroseconds();
+        }
+
+        /// <summary>
+        /// Gets the last changed date time in microseconds.
+        /// </summary>
+        /// <param name="entity">The entity.</param>
+        /// <returns>The last changed date time in microseconds.</returns>
+        public static long GetLastChangedMicroseconds(this ICommonDataObject entity)
+        {
+            return entity?.CommonData?.DateTimeLastChange?.ToUnixTimeMicroseconds() ?? 0;
+        }
+
+        /// <summary>
+        /// Gets the last changed date time in microseconds.
+        /// </summary>
+        /// <param name="entity">The entity.</param>
+        /// <returns>The last changed date time in microseconds.</returns>
+        public static long GetLastChangedMicroseconds(this Witsml200.AbstractObject entity)
+        {
+            return entity?.Citation?.LastUpdate?.ToUnixTimeMicroseconds() ?? 0;
         }
 
         /// <summary>

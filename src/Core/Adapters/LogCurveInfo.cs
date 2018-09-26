@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -82,6 +82,16 @@ namespace PDS.WITSMLstudio.Adapters
         }
 
         /// <summary>
+        /// Returns whether the specified object is an instnce of a supported data type
+        /// </summary>
+        /// <param name="dataObject">The data object.</param>
+        /// <returns></returns>
+        public static bool IsSupportedObject(object dataObject)
+        {
+            return null != dataObject && (dataObject is Energistics.DataAccess.WITSML131.ComponentSchemas.LogCurveInfo || dataObject is Energistics.DataAccess.WITSML141.ComponentSchemas.LogCurveInfo);
+        }
+
+        /// <summary>
         /// The data schema version of the object.
         /// </summary>
         public string DataSchemaVersion { get; }
@@ -108,7 +118,7 @@ namespace PDS.WITSMLstudio.Adapters
         /// <summary>
         /// Gets the mnem alias.
         /// </summary>
-        public string MnemAlias => _logCurveInfo131?.MnemAlias ?? _logCurveInfo141?.MnemAlias.Value;
+        public string MnemAlias => _logCurveInfo131?.MnemAlias ?? _logCurveInfo141?.MnemAlias?.Value;
 
         /// <summary>
         /// Gets the curve description.
@@ -118,7 +128,7 @@ namespace PDS.WITSMLstudio.Adapters
         /// <summary>
         /// Gets the unit.
         /// </summary>
-        public string Unit => _logCurveInfo131?.Unit ?? _logCurveInfo141.Unit;
+        public string Unit => _logCurveInfo131?.Unit ?? _logCurveInfo141?.Unit;
 
         /// <summary>
         /// Gets the null value.

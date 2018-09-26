@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -237,6 +237,16 @@ namespace PDS.WITSMLstudio.Store.Configuration
         /// The maximum number of GetResourcesResponse messages to return.
         /// </summary>
         public static int MaxGetResourcesResponse = Properties.Settings.Default.MaxGetResourcesResponse;
+
+        /// <summary>
+        /// The channel data adapter enabled setting.
+        /// </summary>
+        public static bool IsChannelDataAdapterEnabled = Properties.Settings.Default.IsChannelDataAdapterEnabled;
+
+        /// <summary>
+        /// The default describe URI.
+        /// </summary>
+        public static string DefaultDescribeUri = Properties.Settings.Default.DefaultDescribeUri;
 
         /// <summary>
         /// Gets the size of the range.

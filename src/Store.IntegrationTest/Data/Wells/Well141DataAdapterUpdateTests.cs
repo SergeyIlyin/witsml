@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Core, 2018.1
+// PDS WITSMLstudio Core, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -369,7 +369,7 @@ namespace PDS.WITSMLstudio.Store.Data.Wells
             var queryWell = DevKit.GetAndAssert(new Well() {Uid = response.SuppMsgOut});
             Assert.IsNotNull(queryWell.CommonData);
             Assert.IsNotNull(queryWell.CommonData.AcquisitionTimeZone);
-            Assert.AreEqual(4, queryWell.CommonData.AcquisitionTimeZone.Count);
+            Assert.AreEqual(1, queryWell.CommonData.AcquisitionTimeZone.Count, "Acquisition time zone count did not match");
         }
 
         [TestMethod]

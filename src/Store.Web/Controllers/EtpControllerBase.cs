@@ -1,5 +1,5 @@
 ﻿//----------------------------------------------------------------------- 
-// PDS WITSMLstudio Store, 2018.1
+// PDS WITSMLstudio Store, 2018.3
 //
 // Copyright 2018 PDS Americas LLC
 // 
@@ -19,6 +19,7 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel.Composition;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -27,13 +28,13 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
 using System.Web.WebSockets;
-using Energistics;
-using Energistics.Common;
-using Energistics.Datatypes;
-using Energistics.Protocol.Core;
+using Energistics.Etp;
+using Energistics.Etp.Common;
+using Energistics.Etp.Common.Datatypes;
 using PDS.WITSMLstudio.Framework;
 using PDS.WITSMLstudio.Store.Configuration;
 using PDS.WITSMLstudio.Store.Data;
+using PDS.WITSMLstudio.Store.Providers;
 
 namespace PDS.WITSMLstudio.Store.Controllers
 {
@@ -71,49 +72,57 @@ namespace PDS.WITSMLstudio.Store.Controllers
         public List<IEtpDataProvider> DataAdapters { get; set; }
 
         /// <summary>
+        /// Gets the list of supported ETP versions.
+        /// </summary>
+        /// <returns>A list of supported ETP versions.</returns>
+        protected virtual IList<string> GetEtpVersions()
+        {
+            return new[] { EtpSettings.Etp11SubProtocol, EtpSettings.Etp12SubProtocol };
+        }
+
+        /// <summary>
         /// Gets the server's capabilities.
         /// </summary>
         /// <returns>A <see cref="ServerCapabilities"/> object.</returns>
-        protected IHttpActionResult ServerCapabilities()
+        protected virtual IHttpActionResult ServerCapabilities()
         {
-            var handler = CreateEtpServerHandler(null, null);
-            var supportedObjects = GetSupportedObjects();
+            var parameters = HttpContext.Current?.Request.QueryString;
 
-            var capServer = new ServerCapabilities()
+            if (parameters?[EtpSettings.GetVersionsHeader].EqualsIgnoreCase(bool.TrueString) ?? false)
             {
-                ApplicationName = handler.ApplicationName,
-                ApplicationVersion = handler.ApplicationVersion,
-                SupportedProtocols = handler.GetSupportedProtocols(),
-                SupportedObjects = supportedObjects,
-                SupportedEncodings = string.Join(";", _supportedEncodings),
-                ContactInformation = new Contact
-                {
-                    OrganizationName = WitsmlSettings.DefaultVendorName,
-                    ContactName = WitsmlSettings.DefaultContactName,
-                    ContactEmail = WitsmlSettings.DefaultContactEmail,
-                    ContactPhone = WitsmlSettings.DefaultContactPhone
-                }
-            };
+                return Ok(GetEtpVersions());
+            }
 
-            return Ok(capServer);
+            var etpSubProtocol = GetRequestedEtpSubProtocol(parameters);
+            var buffer = WebSocket.CreateClientBuffer(ushort.MaxValue, ushort.MaxValue);
+
+            using (var stream = new MemoryStream())
+            using (var webSocket = WebSocket.CreateClientWebSocket(stream, etpSubProtocol, ushort.MaxValue, ushort.MaxValue, WebSocket.DefaultKeepAliveInterval, false, buffer))
+            using (var handler = CreateEtpServerHandler(webSocket, null))
+            {
+                var supportedObjects = GetSupportedObjects();
+                var capServer = handler.CreateServerCapabilities(supportedObjects, _supportedEncodings);
+
+                return Ok(capServer);
+            }
         }
 
         /// <summary>
         /// Get the list of client Web Socket connections.
         /// </summary>
         /// <returns>An <see cref="IHttpActionResult"/> containing the list of clients.</returns>
-        protected IHttpActionResult ClientList()
+        protected virtual IHttpActionResult ClientList()
         {
             var clients = EtpServerHandler.Clients.Select(c =>
             {
                 var handler = c.Value;
-                var core = handler.Handler<ICoreServer>() as CoreServerHandler;
+                //var core = handler.Handler<ICoreServer>() as CoreServerHandler;
 
                 return new
                 {
                     handler.SessionId,
-                    core?.ClientApplicationName,
-                    core?.RequestedProtocols
+                    //core?.ClientApplicationName,
+                    //core?.RequestedProtocols
                 };
             });
 
@@ -176,13 +185,27 @@ namespace PDS.WITSMLstudio.Store.Controllers
         /// <returns>A new <see cref="AspNetWebSocketOptions"/> instance.</returns>
         protected virtual AspNetWebSocketOptions CreateWebSocketOptions(IList<string> requestedProtocols)
         {
-            if (!requestedProtocols?.ContainsIgnoreCase(EtpSettings.EtpSubProtocolName) ?? false)
+            var preferredProtocol = requestedProtocols
+                .FirstOrDefault(protocol => EtpSettings.EtpSubProtocols.ContainsIgnoreCase(protocol));
+
+            if (string.IsNullOrWhiteSpace(preferredProtocol))
                 return null;
 
             return new AspNetWebSocketOptions
             {
-                SubProtocol = EtpSettings.EtpSubProtocolName
+                SubProtocol = preferredProtocol
             };
+        }
+
+        /// <summary>
+        /// Gets the requested ETP sub protocol.
+        /// </summary>
+        /// <param name="parameters">The query string parameters.</param>
+        /// <returns>The requested ETP sub protocol.</returns>
+        protected virtual string GetRequestedEtpSubProtocol(NameValueCollection parameters)
+        {
+            var etpVersion = parameters?[EtpSettings.GetVersionHeader] ?? string.Empty;
+            return EtpSettings.EtpSubProtocols.Contains(etpVersion) ? etpVersion : EtpSettings.LegacySubProtocol;
         }
 
         /// <summary>
