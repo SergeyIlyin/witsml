@@ -16,13 +16,11 @@
 // limitations under the License.
 //-----------------------------------------------------------------------
 
-using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
 using Energistics.Etp.Common;
 using Energistics.Etp.Common.Datatypes;
-using Energistics.Etp.v12.Datatypes;
 using Energistics.Etp.v12.Datatypes.Object;
 using Energistics.Etp.v12.Protocol.Discovery;
 using PDS.WITSMLstudio.Framework;
@@ -44,22 +42,6 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         /// <value>The collection of providers.</value>
         [ImportMany]
         public IEnumerable<IDiscoveryStoreProvider> Providers { get; set; }
-
-        /// <summary>
-        /// Gets the capabilities supported by the protocol handler.
-        /// </summary>
-        /// <returns>A collection of protocol capabilities.</returns>
-        public override IDictionary<string, IDataValue> GetCapabilities()
-        {
-            var capabilities = base.GetCapabilities();
-
-            capabilities[MaxGetResourcesResponse] = new DataValue
-            {
-                Item = WitsmlSettings.MaxGetResourcesResponse
-            };
-
-            return capabilities;
-        }
 
         /// <summary>
         /// Handles the GetResources message of the Discovery protocol.
@@ -120,7 +102,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                 Name = name,
                 ChildCount = count,
                 ContentType = uri.ContentType,
-                ResourceType = resourceType.ToString(),
+                ResourceType = (ResourceKind)(int)resourceType,
                 CustomData = new Dictionary<string, string>(),
                 LastChanged = lastChanged,
                 ChannelSubscribable = uri.IsChannelSubscribable(),

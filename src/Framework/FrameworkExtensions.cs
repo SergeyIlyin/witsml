@@ -120,8 +120,7 @@ namespace PDS.WITSMLstudio.Framework
             // TextFieldParser iterates when it detects new line characters
             value = value.Replace("\n", " ");
 
-            using (var reader = new StringReader(value))
-            using (var parser = new TextFieldParser(reader))
+            using (var parser = new TextFieldParser(new StringReader(value)))
             {
                 parser.SetDelimiters(separator);
 
@@ -212,6 +211,20 @@ namespace PDS.WITSMLstudio.Framework
         public static bool EqualsIgnoreCase(this string a, string b)
         {
             return string.Equals(a, b, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        /// <summary>
+        /// Determines whether the string matches the specified pattern
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <param name="pattern">The pattern.</param>
+        /// <returns>
+        ///   <c>true</c> if the specified pattern is match; otherwise, <c>false</c>.
+        /// Empty or null pattern will always match
+        /// </returns>
+        public static bool IsMatch(this string value, string pattern)
+        {
+            return string.IsNullOrWhiteSpace(pattern) || value.EqualsIgnoreCase(pattern);
         }
 
         /// <summary>
@@ -412,8 +425,9 @@ namespace PDS.WITSMLstudio.Framework
         /// </summary>
         /// <param name="enumType">Type of the enum.</param>
         /// <param name="enumValue">The enum value.</param>
-        /// <returns></returns>
-        public static object ParseEnum(this Type enumType, string enumValue)
+        /// <param name="ignoreCase">if set to <c>true</c> comparison is case insensitive.</param>
+        /// <returns>The parsed enumeration value.</returns>
+        public static object ParseEnum(this Type enumType, string enumValue, bool ignoreCase = true)
         {
             if (string.IsNullOrWhiteSpace(enumValue)) return null;
 
@@ -429,24 +443,28 @@ namespace PDS.WITSMLstudio.Framework
 #else
                 if (!double.TryParse(enumValue, out index))
 #endif
-                    return Enum.Parse(enumType, enumValue, true);
+                    return Enum.Parse(enumType, enumValue, ignoreCase);
             }
             catch
             {
                 // Ignore
             }
 
+            var mode = ignoreCase
+                ? StringComparison.InvariantCultureIgnoreCase
+                : StringComparison.InvariantCulture;
+
             var enumMember = enumType.GetMembers().FirstOrDefault(x =>
             {
-                if (x.Name.EqualsIgnoreCase(enumValue))
+                if (string.Equals(x.Name, enumValue, mode))
                     return true;
 
                 var xmlEnumAttrib = XmlAttributeCache<XmlEnumAttribute>.GetCustomAttribute(x);
-                if (xmlEnumAttrib != null && xmlEnumAttrib.Name.EqualsIgnoreCase(enumValue))
+                if (xmlEnumAttrib != null && string.Equals(xmlEnumAttrib.Name, enumValue, mode))
                     return true;
 
                 var descriptionAttr = XmlAttributeCache<DescriptionAttribute>.GetCustomAttribute(x);
-                return descriptionAttr != null && descriptionAttr.Description.EqualsIgnoreCase(enumValue);
+                return descriptionAttr != null && string.Equals(descriptionAttr.Description, enumValue, mode);
             });
 
             // must be a valid enumeration member
@@ -455,7 +473,7 @@ namespace PDS.WITSMLstudio.Framework
                 throw new ArgumentException();
             }
 
-            return Enum.Parse(enumType, enumMember.Name, true);
+            return Enum.Parse(enumType, enumMember.Name, ignoreCase);
         }
 
         /// <summary>

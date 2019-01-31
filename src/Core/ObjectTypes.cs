@@ -23,6 +23,7 @@ using System.Reflection;
 using System.Xml.Linq;
 using System.Xml.Serialization;
 using Energistics.DataAccess;
+using Energistics.Etp.Common.Datatypes;
 using Witsml200 = Energistics.DataAccess.WITSML200;
 using Prodml200 = Energistics.DataAccess.PRODML200;
 using Resqml210 = Energistics.DataAccess.RESQML210;
@@ -35,6 +36,11 @@ namespace PDS.WITSMLstudio
     /// </summary>
     public static partial class ObjectTypes
     {
+        /// <summary>
+        /// The default sort order for v2.0 and above.
+        /// </summary>
+        public const string DefaultSortOrder = "Citation/Title, Uuid";
+
         /// <summary>
         /// The ObjectType identifier for an Id.
         /// </summary>
@@ -115,16 +121,62 @@ namespace PDS.WITSMLstudio
         /// </summary>
         public const string ChannelIndex = "channelIndex";
 
-        private static readonly string[] _growingObjects = { Log, MudLog, Trajectory };
+        /// <summary>
+        /// The ObjectType identifier for a CuttingsGeology.
+        /// </summary>
+        public const string CuttingsGeology = "cuttingsGeology";
 
-        private static readonly string[] _growingPartTypes = { LogCurveInfo, GeologyInterval, TrajectoryStation };
+        /// <summary>
+        /// The ObjectType identifier for a CuttingsGeologyInterval.
+        /// </summary>
+        public const string CuttingsGeologyInterval = "cuttingsGeologyInterval";
+
+        /// <summary>
+        /// The ObjectType identifier for a InterpretedGeology.
+        /// </summary>
+        public const string InterpretedGeology = "interpretedGeology";
+
+        /// <summary>
+        /// The ObjectType identifier for a InterpretedGeologyInterval.
+        /// </summary>
+        public const string InterpretedGeologyInterval = "interpretedGeologyInterval";
+
+        /// <summary>
+        /// The ObjectType identifier for a ShowEvaluation.
+        /// </summary>
+        public const string ShowEvaluation = "showEvaluation";
+
+        /// <summary>
+        /// The ObjectType identifier for a ShowEvaluationInterval.
+        /// </summary>
+        public const string ShowEvaluationInterval = "showEvaluationInterval";
+
+        private static readonly string[] _growingObjects = { Log, MudLog, Trajectory, CuttingsGeology, InterpretedGeology, ShowEvaluation };
+
+        private static readonly string[] _growingPartTypes = { LogCurveInfo, GeologyInterval, TrajectoryStation, CuttingsGeologyInterval, InterpretedGeologyInterval, ShowEvaluationInterval };
 
         private static readonly string[] _decoratorObjects = { Activity, DataAssuranceRecord };
 
+        private static Dictionary<Type, string> _elementNameOverrides = new Dictionary<Type, string>
+        {
+            { typeof(Witsml200.CuttingsGeology), "CuttingsIntervalSet"},
+            { typeof(Witsml200.CuttingsGeologyInterval), "CuttingsInterval"},
+            { typeof(Witsml200.InterpretedGeology), "InterpretedGeologyIntervalSet"},
+            { typeof(Witsml200.InterpretedGeologyInterval), "GeologicIntervalInterpreted"},
+            { typeof(Witsml200.ComponentSchemas.InterpretedIntervalLithology), "InterpretedLithology"},
+            { typeof(Witsml200.ShowEvaluation), "ShowIntervalSet"},
+            { typeof(Witsml200.ShowEvaluationInterval), "EvaluatedIntervalShow"}
+        };
+
         /// <summary>
-        /// The object type map
+        /// The object type map.
         /// </summary>
         public static readonly IDictionary<string, string> ObjectTypeMap;
+
+        /// <summary>
+        /// The child object reference map.
+        /// </summary>
+        public static readonly IDictionary<EtpContentType, string[]> ChildObjectReferences;
 
         /// <summary>
         /// Initializes the <see cref="ObjectTypes"/> class.
@@ -138,6 +190,31 @@ namespace PDS.WITSMLstudio
                 .Where(x => x != null)
                 .Cast<string>()
                 .ToDictionary(x => x, StringComparer.InvariantCultureIgnoreCase);
+
+            ChildObjectReferences = new Dictionary<EtpContentType, string[]>
+            {
+                { EtpContentTypes.Witsml200.For(BhaRun), new [] { "Tubular" }},
+                { EtpContentTypes.Witsml200.For(CementJob), new [] { "HoleConfig" }},
+                { EtpContentTypes.Witsml200.For(MudLogReport), new [] { "WellboreGeometry" }},
+                //{ EtpContentTypes.Witsml200.For(MudLogReportInterval), new [] { "CuttingsGeologyInterval" }},
+                //{ EtpContentTypes.Witsml200.For(MudLogReportInterval), new [] { "InterpretedGeologyInterval" }},
+                //{ EtpContentTypes.Witsml200.For(MudLogReportInterval), new [] { "ShowEvaluationInterval" }},
+                { EtpContentTypes.Witsml200.For(OpsReport), new [] { "WellboreGeometry" }},
+                { EtpContentTypes.Witsml200.For(TrajectoryStation), new [] { "IscwsaToolErrorModel" }},
+                { EtpContentTypes.Witsml200.For(WellboreMarker), new [] { "Trajectory" }}
+            };
+        }
+
+        /// <summary>
+        /// Determines whether the specified property name is for a child data object reference.
+        /// </summary>
+        /// <param name="contentType">The content type.</param>
+        /// <param name="propertyName">The property name.</param>
+        /// <returns><c>true</c> if the property name is for a child data object reference; otherwise, <c>false</c>.</returns>
+        public static bool IsChildObjectReference(EtpContentType contentType, string propertyName)
+        {
+            string[] values;
+            return ChildObjectReferences.TryGetValue(contentType, out values) && (values?.ContainsIgnoreCase(propertyName) ?? false);
         }
 
         /// <summary>
@@ -505,6 +582,18 @@ namespace PDS.WITSMLstudio
                 : pluralString.EndsWith("s")
                 ? pluralString.Substring(0, pluralString.Length - 1)
                 : pluralString;
+        }
+
+        /// <summary>
+        /// Gets the element name override.
+        /// </summary>
+        /// <param name="objectType">Type of the object.</param>
+        /// <returns>Name override</returns>
+        public static string GetElementNameOverride(Type objectType)
+        {
+            string elementName;
+            _elementNameOverrides.TryGetValue(objectType, out elementName);
+            return elementName;
         }
     }
 }

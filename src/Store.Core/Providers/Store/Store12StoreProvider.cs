@@ -97,7 +97,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Store
                 Name = name,
                 ChildCount = childCount,
                 ContentType = uri.ContentType,
-                ResourceType = ResourceTypes.DataObject.ToString(),
+                ResourceType = ResourceKind.DataObject,
                 CustomData = new Dictionary<string, string>(),
                 LastChanged = lastChanged,
                 ChannelSubscribable = uri.IsChannelSubscribable(),

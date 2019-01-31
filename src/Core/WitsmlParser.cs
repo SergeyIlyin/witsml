@@ -181,11 +181,19 @@ namespace PDS.WITSMLstudio
 
             if (root == null) return string.Empty;
 
-            root = root.UpdateRootElementName(obj.GetType(), removeTypePrefix);
+            var elementName = ObjectTypes.GetElementNameOverride(obj.GetType());
+            root = root.UpdateRootElementName(obj.GetType(), removeTypePrefix, elementNameOverride: elementName);
 
-            foreach (var element in root.Elements())
+            if (ObjectTypes.GetVersion(root).StartsWith("1."))
             {
-                RemoveEmptyElements(element, nilOnly);
+                foreach (var element in root.Elements())
+                {
+                    RemoveEmptyElements(element, nilOnly);
+                }
+            }
+            else
+            {
+                RemoveEmptyElements(root, nilOnly);
             }
 
             return root.ToString(SaveOptions.OmitDuplicateNamespaces);

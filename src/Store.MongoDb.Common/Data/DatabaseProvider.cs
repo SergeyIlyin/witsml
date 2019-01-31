@@ -20,8 +20,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Configuration;
+using System.Threading;
 using MongoDB.Driver;
-using PDS.WITSMLstudio.Framework;
 using PDS.WITSMLstudio.Store.MongoDb.Common;
 
 namespace PDS.WITSMLstudio.Store.Data
@@ -37,71 +37,81 @@ namespace PDS.WITSMLstudio.Store.Data
         internal static readonly string DefaultConnectionString = Settings.Default.DefaultConnectionString;
         internal static readonly string DefaultDatabaseName = Settings.Default.DefaultDatabaseName;
 
-        private readonly IContainer _container;
-        private readonly Lazy<IMongoClient> _client;
-        private readonly string _connectionString;
-        private readonly string _databaseName;
+        private readonly ReaderWriterLockSlim _lock;
+        private ClientConnection _connection;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DatabaseProvider" /> class.
         /// </summary>
-        /// <param name="container">The composition container.</param>
         /// <param name="mappers">The MongoDb class mappers.</param>
         [ImportingConstructor]
-        public DatabaseProvider(IContainer container, [ImportMany] IEnumerable<IMongoDbClassMapper> mappers)
+        public DatabaseProvider([ImportMany] IEnumerable<IMongoDbClassMapper> mappers) : this(mappers, GetConnectionString())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DatabaseProvider"/> class.
+        /// </summary>
+        /// <param name="mappers">The MongoDb class mappers.</param>
+        /// <param name="connectionString">The connection string.</param>
+        internal DatabaseProvider(IEnumerable<IMongoDbClassMapper> mappers, string connectionString)
         {
             MongoDefaults.MaxConnectionIdleTime = TimeSpan.FromMinutes(1);
-            _container = container;
-            _client = new Lazy<IMongoClient>(CreateMongoClient);
-            _connectionString = GetConnectionString();
-            _databaseName = GetDatabaseName(_connectionString);
+            _lock = new ReaderWriterLockSlim();
+
+            SetConnectionString(connectionString);
 
             foreach (var mapper in mappers)
                 mapper.Register();
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DatabaseProvider"/> class.
+        /// Gets or sets the client connection.
         /// </summary>
-        /// <param name="container">The composition container.</param>
-        /// <param name="mappers">The MongoDb class mappers.</param>
-        /// <param name="connectionString">The connection string.</param>
-        internal DatabaseProvider(IContainer container, IEnumerable<IMongoDbClassMapper> mappers, string connectionString) : this(container, mappers)
+        private ClientConnection Connection
         {
-            _connectionString = connectionString;
-            _databaseName = GetDatabaseName(_connectionString);
+            get
+            {
+                _lock.EnterReadLock();
+
+                try
+                {
+                    return _connection;
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+            }
+            set
+            {
+                _lock.EnterWriteLock();
+
+                try
+                {
+                    _connection = value;
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
         }
 
         /// <summary>
         /// Gets the MongoDb client interface.
         /// </summary>
-        /// <value>The client interface.</value>
-        public IMongoClient Client
-        {
-            get { return _client.Value; }
-        }
+        public IMongoClient Client => Connection.Client;
 
         /// <summary>
         /// Gets the connection string.
         /// </summary>
-        /// <value>
-        /// The connection string.
-        /// </value>
-        public string ConnectionString
-        {
-            get { return _connectionString; }
-        }
+        public string ConnectionString => Connection.ConnectionString;
 
         /// <summary>
         /// Gets the name of the database.
         /// </summary>
-        /// <value>
-        /// The name of the database.
-        /// </value>
-        public string DatabaseName
-        {
-            get { return _databaseName; }
-        }
+        public string DatabaseName => Connection.DatabaseName;
 
         /// <summary>
         /// Gets the MongoDb database interface.
@@ -109,26 +119,29 @@ namespace PDS.WITSMLstudio.Store.Data
         /// <returns>The database interface.</returns>
         public IMongoDatabase GetDatabase()
         {
-            return Client.GetDatabase(_databaseName);
+            var connection = Connection;
+            return connection.Client.GetDatabase(connection.DatabaseName);
+        }
+
+        /// <summary>
+        /// Sets the Mongo database connection string.
+        /// </summary>
+        /// <param name="connectionString">The connection string.</param>
+        public void SetConnectionString(string connectionString)
+        {
+            Connection = new ClientConnection(
+                CreateMongoClient(connectionString),
+                connectionString,
+                GetDatabaseName(connectionString));
         }
 
         /// <summary>
         /// Creates the MongoDb client instance.
         /// </summary>
         /// <returns>The client interface.</returns>
-        private IMongoClient CreateMongoClient()
+        private static IMongoClient CreateMongoClient(string connectionString)
         {
-            return new MongoClient(_connectionString);
-        }
-
-        /// <summary>
-        /// Gets the connection string.
-        /// </summary>
-        /// <returns>The connection string.</returns>
-        private string GetConnectionString()
-        {
-            var settings = ConfigurationManager.ConnectionStrings["MongoDbConnection"];
-            return settings == null ? DefaultConnectionString : settings.ConnectionString;
+            return new MongoClient(connectionString);
         }
 
         /// <summary>
@@ -136,13 +149,57 @@ namespace PDS.WITSMLstudio.Store.Data
         /// </summary>
         /// <param name="connectionString">The connection string.</param>
         /// <returns>The database name.</returns>
-        private string GetDatabaseName(string connectionString)
+        private static string GetDatabaseName(string connectionString)
         {
             var url = MongoUrl.Create(connectionString);
 
             return string.IsNullOrWhiteSpace(url?.DatabaseName)
                 ? DefaultDatabaseName
                 : url.DatabaseName;
+        }
+
+        /// <summary>
+        /// Gets the connection string.
+        /// </summary>
+        /// <returns>The connection string.</returns>
+        private static string GetConnectionString()
+        {
+            var settings = ConfigurationManager.ConnectionStrings["MongoDbConnection"];
+            return settings == null ? DefaultConnectionString : settings.ConnectionString;
+        }
+
+        /// <summary>
+        /// Encapsulates the MongoDB client connection details.
+        /// </summary>
+        private class ClientConnection
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ClientConnection"/> class.
+            /// </summary>
+            /// <param name="client">The MongoDB client.</param>
+            /// <param name="connectionString">The connection string.</param>
+            /// <param name="databaseName">The database name.</param>
+            public ClientConnection(IMongoClient client, string connectionString, string databaseName)
+            {
+                Client = client;
+                ConnectionString = connectionString;
+                DatabaseName = databaseName;
+            }
+
+            /// <summary>
+            /// Gets the MongoDB client.
+            /// </summary>
+            public IMongoClient Client { get; }
+
+            /// <summary>
+            /// Gets the connection string.
+            /// </summary>
+            public string ConnectionString { get; }
+
+            /// <summary>
+            /// Gets the name of the database.
+            /// </summary>
+            public string DatabaseName { get; }
         }
     }
 }

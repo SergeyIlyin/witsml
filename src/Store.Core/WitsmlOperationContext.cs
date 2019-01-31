@@ -23,6 +23,7 @@ using System.Threading;
 using System.Web;
 using System.Xml.Linq;
 using Energistics.DataAccess.Validation;
+using Energistics.Etp.Common.Datatypes.Object;
 using Witsml141 = Energistics.DataAccess.WITSML141;
 using log4net;
 using PDS.WITSMLstudio.Store.Configuration;
@@ -112,6 +113,18 @@ namespace PDS.WITSMLstudio.Store
         public RequestContext Request { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the input XML in the request is compressed.
+        /// </summary>
+        /// <value>Whether or not the input XML in the request is compressed.</value>
+        public bool RequestCompressed { get; set; }
+
+        /// <summary>
+        /// Gets or sets a dictionary containing the options in associated with the request.
+        /// </summary>
+        /// <value>The dictionary of options in.</value>
+        public Dictionary<string, string> OptionsIn { get; set; }
+
+        /// <summary>
         /// Gets or sets the response context.
         /// </summary>
         /// <value>The response context.</value>
@@ -122,6 +135,11 @@ namespace PDS.WITSMLstudio.Store
         /// </summary>
         /// <value>The XML document.</value>
         public XDocument Document { get; set; }
+
+        /// <summary>
+        /// Gets or sets the data object.
+        /// </summary>
+        public IDataObject DataObject { get; set; }
 
         /// <summary>
         /// Gets or sets the data schema version for the context.

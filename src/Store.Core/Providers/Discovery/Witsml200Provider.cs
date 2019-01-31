@@ -43,6 +43,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         private readonly IContainer _container;
         private readonly IEtpDataProvider<Log> _logDataProvider;
         private readonly IEtpDataProvider<ChannelSet> _channelSetDataProvider;
+        private readonly IEtpDataProvider<WellboreGeology> _wellboreGeologyDataProvider;
         private readonly IList<EtpContentType> _contentTypes;
 
         /// <summary>
@@ -51,15 +52,18 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         /// <param name="container">The composition container.</param>
         /// <param name="logDataProvider">The log data Provider.</param>
         /// <param name="channelSetDataProvider">The channel set data Provider.</param>
+        /// <param name="wellboreGeologyDataProvider">The wellbore geology data Provider.</param>
         [ImportingConstructor]
         public Witsml200Provider(
             IContainer container,
             IEtpDataProvider<Log> logDataProvider,
-            IEtpDataProvider<ChannelSet> channelSetDataProvider)
+            IEtpDataProvider<ChannelSet> channelSetDataProvider,
+            IEtpDataProvider<WellboreGeology> wellboreGeologyDataProvider)
         {
             _container = container;
             _logDataProvider = logDataProvider;
             _channelSetDataProvider = channelSetDataProvider;
+            _wellboreGeologyDataProvider = wellboreGeologyDataProvider;
             _contentTypes = new List<EtpContentType>();
         }
 
@@ -83,7 +87,8 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         /// <param name="args">The <see cref="ProtocolEventArgs{GetResources, IList}" /> instance containing the event data.</param>
         public void GetResources(IEtpAdapter etpAdapter, ProtocolEventArgs<Etp11.Protocol.Discovery.GetResources, IList<Etp11.Datatypes.Object.Resource>> args)
         {
-            GetResources(etpAdapter, args.Message.Uri, args.Context);
+            string serverSortOrder;
+            GetResources(etpAdapter, args.Message.Uri, args.Context, out serverSortOrder);
         }
 
         /// <summary>
@@ -93,7 +98,8 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         /// <param name="args">The <see cref="ProtocolEventArgs{GetResources, IList}"/> instance containing the event data.</param>
         public void GetResources(IEtpAdapter etpAdapter, ProtocolEventArgs<Etp12.Protocol.Discovery.GetResources, IList<Etp12.Datatypes.Object.Resource>> args)
         {
-            GetResources(etpAdapter, args.Message.Uri, args.Context);
+            string serverSortOrder;
+            GetResources(etpAdapter, args.Message.Uri, args.Context, out serverSortOrder);
         }
 
         /// <summary>
@@ -101,17 +107,26 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
         /// </summary>
         /// <param name="etpAdapter">The ETP adapter.</param>
         /// <param name="args">The <see cref="ProtocolEventArgs{FindResources, IList}"/> instance containing the event data.</param>
-        public void FindResources(IEtpAdapter etpAdapter, ProtocolEventArgs<Etp12.Protocol.DiscoveryQuery.FindResources, IList<Etp12.Datatypes.Object.Resource>> args)
+        public void FindResources(IEtpAdapter etpAdapter, ProtocolEventArgs<Etp12.Protocol.DiscoveryQuery.FindResources, Etp12.Protocol.DiscoveryQuery.ResourceResponse> args)
         {
-            GetResources(etpAdapter, args.Message.Uri, args.Context);
+            var count = args.Context.Resources.Count;
+            string serverSortOrder;
+
+            GetResources(etpAdapter, args.Message.Uri, args.Context.Resources, out serverSortOrder);
+
+            if (args.Context.Resources.Count > count)
+                args.Context.ServerSortOrder = serverSortOrder;
         }
 
-        private void GetResources<T>(IEtpAdapter etpAdapter, string uri, IList<T> resources) where T : IResource
+        private void GetResources<T>(IEtpAdapter etpAdapter, string uri, IList<T> resources, out string serverSortOrder) where T : IResource
         {
+            // Default to Name in IResource
+            serverSortOrder = ObjectTypes.NameProperty;
+
             if (EtpUris.IsRootUri(uri))
             {
-                resources.Add(etpAdapter.NewProtocol(EtpUris.Witsml200, "WITSML Store (2.0)"));
-                resources.Add(etpAdapter.NewProtocol(EtpUris.Eml210, "EML Common (2.1)"));
+                var childCount = CreateFoldersByObjectType(etpAdapter, EtpUris.Witsml200, skipChildCount: true).Count;
+                resources.Add(etpAdapter.NewProtocol(EtpUris.Witsml200, "WITSML Store (2.0)", childCount));
                 return;
             }
 
@@ -138,12 +153,14 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                 if (!isChannelDataAdapterEnabled && ObjectTypes.ChannelSet.EqualsIgnoreCase(etpUri.ObjectType) && ObjectTypes.Log.EqualsIgnoreCase(parentUri.ObjectType))
                 {
                     var log = _logDataProvider.Get(parentUri);
-                    log?.ChannelSet?.ForEach(x => resources.Add(ToResource(etpAdapter, x, parentUri)));
+                    log?.ChannelSet?.OrderBy(x => x.Citation.Title).ForEach(x => resources.Add(ToResource(etpAdapter, x, parentUri)));
+                    serverSortOrder = _channelSetDataProvider.ServerSortOrder;
                 }
                 else if (!isChannelDataAdapterEnabled && ObjectTypes.Channel.EqualsIgnoreCase(etpUri.ObjectType) && ObjectTypes.ChannelSet.EqualsIgnoreCase(parentUri.ObjectType))
                 {
                     var set = _channelSetDataProvider.Get(parentUri);
-                    set?.Channel?.ForEach(x => resources.Add(ToResource(etpAdapter, x, parentUri)));
+                    set?.Channel?.OrderBy(x => x.Citation.Title).ForEach(x => resources.Add(ToResource(etpAdapter, x, parentUri)));
+                    serverSortOrder = _channelSetDataProvider.ServerSortOrder;
                 }
                 else
                 {
@@ -151,6 +168,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                     var contentType = EtpContentTypes.GetContentType(objectType);
                     var hasChildren = contentType.IsRelatedTo(EtpContentTypes.Eml210) ? 0 : -1;
                     var dataProvider = GetDataProvider(etpUri.ObjectType);
+                    serverSortOrder = dataProvider.ServerSortOrder;
 
                     dataProvider
                         .GetAll(parentUri)
@@ -174,6 +192,13 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                 CreateFoldersByObjectType(etpAdapter, etpUri, "ChannelSet", ObjectTypes.Channel, hasChildren)
                     .ForEach(resources.Add);
             }
+            else if (ObjectTypes.WellboreGeology.EqualsIgnoreCase(etpUri.ObjectType))
+            {
+                const int childCount = 0;
+                resources.Add(etpAdapter.NewFolder(etpUri, EtpContentTypes.GetContentType(typeof(CuttingsGeology)), ObjectTypes.CuttingsGeology.ToPascalCase(), childCount));
+                resources.Add(etpAdapter.NewFolder(etpUri, EtpContentTypes.GetContentType(typeof(InterpretedGeology)), ObjectTypes.InterpretedGeology.ToPascalCase(), childCount));
+                resources.Add(etpAdapter.NewFolder(etpUri, EtpContentTypes.GetContentType(typeof(ShowEvaluation)), ObjectTypes.ShowEvaluation.ToPascalCase(), childCount));
+            }
             else
             {
                 var propertyName = etpUri.ObjectType.ToPascalCase();
@@ -183,7 +208,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
             }
         }
 
-        private IList<IResource> CreateFoldersByObjectType(IEtpAdapter etpAdapter, EtpUri uri, string propertyName = null, string additionalObjectType = null, int childCount = 0)
+        private IList<IResource> CreateFoldersByObjectType(IEtpAdapter etpAdapter, EtpUri uri, string propertyName = null, string additionalObjectType = null, int childCount = 0, bool skipChildCount = false)
         {
             if (!_contentTypes.Any())
             {
@@ -215,6 +240,10 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                     if (string.IsNullOrWhiteSpace(uri.ObjectId) || string.IsNullOrWhiteSpace(propertyName))
                         return x.ContentType.IsRelatedTo(EtpContentTypes.Witsml200); // || x.ReferenceInfo == null;
 
+                    // Fix for child data object references being treated as parent references
+                    if (ObjectTypes.IsChildObjectReference(x.ContentType, propertyName))
+                        return false;
+
                     // Data object sub folders, e.g. Well and Wellbore
                     return (x.ContentType.IsRelatedTo(EtpContentTypes.Eml210) && x.ReferenceInfo != null) ||
                            x.PropertyInfo?.PropertyType == typeof(DataObjectReference) ||
@@ -228,7 +257,7 @@ namespace PDS.WITSMLstudio.Store.Providers.Discovery
                     var hasChildren = childCount;
 
                     // Query for child object count if this is not the specified "additionalObjectType"
-                    if (!x.ContentType.ObjectType.EqualsIgnoreCase(additionalObjectType))
+                    if (!skipChildCount && !x.ContentType.ObjectType.EqualsIgnoreCase(additionalObjectType))
                         hasChildren = dataProvider.Count(uri);
 
                     return etpAdapter.NewFolder(uri, x.ContentType, folderName, hasChildren);
