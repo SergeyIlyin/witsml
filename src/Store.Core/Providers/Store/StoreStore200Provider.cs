@@ -25,6 +25,7 @@ using Etp12 = Energistics.Etp.v12;
 using PDS.WITSMLstudio.Framework;
 using PDS.WITSMLstudio.Store.Data;
 using Witsml200 = Energistics.DataAccess.WITSML200;
+using Prodml200 = Energistics.DataAccess.PRODML200;
 
 namespace PDS.WITSMLstudio.Store.Providers.Store
 {
@@ -94,10 +95,19 @@ namespace PDS.WITSMLstudio.Store.Providers.Store
         {
             var etpUri = new EtpUri(uri);
             var dataAdapter = Container.Resolve<IEtpDataProvider>(new ObjectName(etpUri.ObjectType, etpUri.GetDataSchemaVersion()));
-            var entity = dataAdapter.Get(etpUri) as Witsml200.AbstractObject;
-            var lastChanged = (entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
 
-            etpAdapter.SetDataObject(dataObject, entity, etpUri, GetName(entity), lastChanged: lastChanged);
+            var entity = dataAdapter.Get(etpUri);
+
+            if (entity is Witsml200.AbstractObject w_entity)
+            {
+                var lastChanged = (w_entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
+                etpAdapter.SetDataObject(dataObject, entity, etpUri, GetName(w_entity), lastChanged: lastChanged);
+            }
+            else if (entity is Prodml200.AbstractObject p_entity)
+            {
+                var lastChanged = (p_entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
+                etpAdapter.SetDataObject(dataObject, entity, etpUri, GetName(p_entity), lastChanged: lastChanged);
+            }
         }
 
         private void FindObjects(IEtpAdapter etpAdapter, string uri, IList<Etp12.Datatypes.Object.DataObject> context, out string serverSortOrder)
@@ -109,16 +119,31 @@ namespace PDS.WITSMLstudio.Store.Providers.Store
 
             foreach (var result in dataAdapter.GetAll(etpUri))
             {
-                var entity = result as Witsml200.AbstractObject;
-                var lastChanged = (entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
-                var dataObject = new Etp12.Datatypes.Object.DataObject();
+                if (result is Witsml200.AbstractObject w_entity)
+                {
+                    var lastChanged = (w_entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
+                    var dataObject = new Etp12.Datatypes.Object.DataObject();
 
-                etpAdapter.SetDataObject(dataObject, entity, etpUri, GetName(entity), lastChanged: lastChanged);
-                context.Add(dataObject);
+                    etpAdapter.SetDataObject(dataObject, w_entity, etpUri, GetName(w_entity), lastChanged: lastChanged);
+                    context.Add(dataObject);
+                }
+                else if (result is Witsml200.AbstractObject p_entity)
+                {
+                    var lastChanged = (p_entity?.Citation.LastUpdate).ToUnixTimeMicroseconds().GetValueOrDefault();
+                    var dataObject = new Etp12.Datatypes.Object.DataObject();
+
+                    etpAdapter.SetDataObject(dataObject, p_entity, etpUri, GetName(p_entity), lastChanged: lastChanged);
+                    context.Add(dataObject);
+                }
             }
         }
 
         private string GetName(Witsml200.AbstractObject entity)
+        {
+            return entity == null ? string.Empty : entity.Citation.Title;
+        }
+
+        private string GetName(Prodml200.AbstractObject entity)
         {
             return entity == null ? string.Empty : entity.Citation.Title;
         }
