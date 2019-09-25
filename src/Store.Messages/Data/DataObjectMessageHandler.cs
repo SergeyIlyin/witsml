@@ -16,21 +16,53 @@
 // limitations under the License.
 //-----------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
 using System.Web;
 using Energistics.Etp.Common.Datatypes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using PDS.WITSMLstudio.Framework;
 
 namespace PDS.WITSMLstudio.Store.Data
 {
     /// <summary>
     /// Provides common properties and methods for all strongly typed data object message handlers.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="TObject">The data object type.</typeparam>
     /// <seealso cref="PDS.WITSMLstudio.Store.Data.DataObjectMessageHandler" />
     /// <seealso cref="PDS.WITSMLstudio.Store.Data.IDataObjectMessageHandler{T}" />
     public class DataObjectMessageHandler<T> : DataObjectMessageHandler, IDataObjectMessageHandler<T>
     {
+        /// <summary>
+        /// Gets a data object based on the specified URI.
+        /// </summary>
+        /// <param name="uri">The data object URI.</param>
+        /// <returns>A data object retrieved from the data store.</returns>
+        public virtual T GetObject(EtpUri uri)
+        {
+            return default(T);
+        }
+
+        /// <summary>
+        /// Gets a collection of data objects related to the specified URI.
+        /// </summary>
+        /// <param name="parentUri">The parent URI.</param>
+        /// <returns>A collection of data objects.</returns>
+        public virtual List<T> GetAll(EtpUri? parentUri = null)
+        {
+            return new List<T>();
+        }
+
+        /// <summary>
+        /// Gets a collection of data objects based on the specified query template parser.
+        /// </summary>
+        /// <param name="parser">The query template parser.</param>
+        /// <returns>A collection of data objects retrieved from the data store.</returns>
+        public virtual List<T> GetAll(WitsmlQueryParser parser)
+        {
+            return new List<T>();
+        }
     }
 
     /// <summary>
@@ -41,59 +73,95 @@ namespace PDS.WITSMLstudio.Store.Data
     public class DataObjectMessageHandler : IDataObjectMessageHandler
     {
         /// <summary>
+        /// Determines whether querying is enabled, e.g. GetFromStore, GetObject, etc.
+        /// </summary>
+        public virtual bool IsQueryEnabled => false;
+
+        /// <summary>
         /// Gets the json serializer settings.
         /// </summary>
         protected virtual JsonSerializerSettings JsonSettings { get; } = new JsonSerializerSettings
         {
+            NullValueHandling = NullValueHandling.Ignore,
+            ContractResolver = new MessageContractResolver(),
             Converters = new JsonConverter[]
             {
-                new StringEnumConverter()
+                new StringEnumConverter(),
+                new TimestampConverter()
             }
         };
 
         /// <summary>
-        /// Creates the message.
+        /// Gets a value indicating whether validation is enabled for this data object type.
+        /// </summary>
+        /// <param name="function">The WITSML API method.</param>
+        /// <param name="parser">The input template parser.</param>
+        /// <param name="dataObject">The data object.</param>
+        /// <returns><c>true</c> if validation is enabled for this data object type; otherwise, <c>false</c>.</returns>
+        public virtual bool IsValidationEnabled(Functions function, WitsmlQueryParser parser, object dataObject) => false;
+
+        /// <summary>
+        /// Creates the data object messages.
         /// </summary>
         /// <param name="objectType">The object type.</param>
         /// <param name="uri">The URI.</param>
         /// <param name="dataObject">The data object.</param>
         /// <returns></returns>
-        public virtual DataObjectMessage CreateMessage(string objectType, EtpUri uri, object dataObject = null)
+        public virtual List<DataObjectMessage> CreateMessages(string objectType, EtpUri uri, object dataObject = null)
         {
-            var message = CreateDataObjectMessage(uri, dataObject);
+            var messages = CreateDataObjectMessages(uri, dataObject);
             var witsmlContext = WitsmlOperationContext.Current;
             //var serviceContext = WebOperationContext.Current;
             var httpContext = HttpContext.Current;
             var httpRequest = httpContext?.Request;
 
-            if (httpRequest != null)
-            {
-                message.UserHost = httpRequest.UserHostAddress;
-                message.UserAgent = httpRequest.UserAgent;
-                message.Username = httpContext.User?.Identity?.Name;
+            var commonDataObject = dataObject as Energistics.DataAccess.ICommonDataObject;
+            var abstractDataObject = dataObject as Energistics.DataAccess.WITSML200.AbstractObject;
 
-                if (httpContext.IsWebSocketRequest)
+            var createdDateTime = commonDataObject?.CommonData?.DateTimeCreation == null
+                ? abstractDataObject?.Citation?.Creation?.ToUniversalTime()
+                : ((DateTimeOffset) commonDataObject.CommonData.DateTimeCreation.Value).UtcDateTime;
+
+            var lastUpdateDateTime = commonDataObject?.CommonData?.DateTimeLastChange == null
+                ? abstractDataObject?.Citation?.LastUpdate?.ToUniversalTime()
+                : ((DateTimeOffset) commonDataObject.CommonData.DateTimeLastChange.Value).UtcDateTime;
+
+            foreach (var message in messages)
+            {
+                if (httpRequest != null)
                 {
-                    // TODO: What is needed for ETP connections?
+                    message.UserHost = httpRequest.UserHostAddress;
+                    message.UserAgent = httpRequest.UserAgent;
+                    message.Username = httpContext.User?.Identity?.Name;
+
+                    if (httpContext.IsWebSocketRequest)
+                    {
+                        // TODO: What is needed for ETP connections?
+                    }
                 }
+
+                message.Function = witsmlContext.Request.Function;
+                message.OptionsIn = witsmlContext.Request.Options;
+                message.ObjectType = objectType;
+                message.CreatedDateTime = createdDateTime;
+                message.LastUpdateDateTime = lastUpdateDateTime;
             }
 
-            message.Function = witsmlContext.Request.Function;
-            message.OptionsIn = witsmlContext.Request.Options;
-            message.ObjectType = objectType;
-
-            return message;
+            return messages;
         }
 
         /// <summary>
-        /// Creates the data object message.
+        /// Creates the data object messages.
         /// </summary>
         /// <param name="uri">The URI.</param>
         /// <param name="dataObject">The data object.</param>
         /// <returns></returns>
-        public virtual DataObjectMessage CreateDataObjectMessage(EtpUri uri, object dataObject = null)
+        public virtual List<DataObjectMessage> CreateDataObjectMessages(EtpUri uri, object dataObject = null)
         {
-            return new DataObjectMessage(uri, dataObject);
+            return new List<DataObjectMessage>
+            {
+                new DataObjectMessage(uri, dataObject)
+            };
         }
 
         /// <summary>
